@@ -28,10 +28,3 @@ def get_table_and_column_names(db_path):
         db_schema_str += "%s %s\n" % (table_name, get_column_names(table_name,
                                                                    cursor))
     return db_schema_str
-
-
-def dump_db_schema(db_path, out_dir):
-    out_fname = basename(db_path).replace(CRAWL_DB_EXT, DB_SCHEMA_SUFFIX)
-    db_schema_path = join(out_dir, out_fname)
-    with open(db_schema_path, 'w') as o:
-        o.write()

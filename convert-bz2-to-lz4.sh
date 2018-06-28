@@ -2,7 +2,7 @@
 set -e
 
 CENSUS_DATA_PATH="/mnt/10tb3/census_data"
-OUTDIR="/mnt/10tb4"
+OUTDIR="/mnt/10tb4/census_data_lz4"
 
 function convert_bz2_to_lz4(){
  ARCHIVE_BASE_NAME=$(basename "$1")

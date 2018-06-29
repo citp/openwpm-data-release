@@ -1,6 +1,6 @@
 import sys
 from util import CRAWL_DB_EXT, get_table_and_column_names
-from os.path import join, isfile, basename, isdir
+from os.path import join, isfile, basename, isdir, dirname
 import glob
 from shutil import copyfile
 
@@ -20,7 +20,7 @@ JAVASCRIPT_SRC_DIRNAME = "content.ldb"
 class CrawlData(object):
 
     def __init__(self, crawl_dir):
-        self.crawl_dir = crawl_dir
+        self.set_crawl_dir(crawl_dir)
         self.crawl_name = basename(crawl_dir)
         self.crawl_db_path = ""
         self.openwpm_log_path = ""
@@ -29,6 +29,16 @@ class CrawlData(object):
         self.set_db_path()
         self.set_crawl_file_paths()
         self.check_js_src_code()
+
+    def set_crawl_dir(self, crawl_dir):
+        """."""
+        if isdir(crawl_dir):
+            self.crawl_dir = crawl_dir
+        else:
+            print "Missing crawl dir (archive name mismatch)", crawl_dir
+            crawl_dir_pattern = join(dirname(crawl_dir), "20*")
+            self.crawl_dir = glob.glob(crawl_dir_pattern)[0]
+        print "Crawl dir", self.crawl_dir
 
     def check_js_src_code(self):
         js_sources_dir = join(self.crawl_dir, JAVASCRIPT_SRC_DIRNAME)

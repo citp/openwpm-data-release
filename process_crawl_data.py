@@ -1,8 +1,11 @@
 import sys
-from util import CRAWL_DB_EXT, get_table_and_column_names
-from os.path import join, isfile, basename, isdir, dirname
+import sqlite3
+from util import CRAWL_DB_EXT, get_table_and_column_names, load_alexa_ranks
+from os.path import join, isfile, basename, isdir, dirname, sep
 import glob
 from shutil import copyfile
+from normalize_db import add_site_visits_table, add_alexa_rank_to_site_visits,\
+    add_missing_columns_to_all_tables
 
 ROOT_OUT_DIR = "/mnt/10tb4/census-release"
 if not isdir(ROOT_OUT_DIR):
@@ -21,7 +24,7 @@ class CrawlData(object):
 
     def __init__(self, crawl_dir):
         self.set_crawl_dir(crawl_dir)
-        self.crawl_name = basename(crawl_dir)
+        self.crawl_name = basename(crawl_dir.rstrip(sep))
         self.crawl_db_path = ""
         self.openwpm_log_path = ""
         self.crontab_log_path = ""
@@ -29,6 +32,7 @@ class CrawlData(object):
         self.set_db_path()
         self.set_crawl_file_paths()
         self.check_js_src_code()
+        self.db_conn = sqlite3.connect(self.crawl_db_path)
 
     def set_crawl_dir(self, crawl_dir):
         """."""
@@ -70,16 +74,32 @@ class CrawlData(object):
         print "Will process", self.crawl_dir
         self.backup_crawl_files()
         self.dump_db_schema()
+        self.normalize_db()
+
+    def normalize_db(self):
+        db_schema_str = get_table_and_column_names(self.crawl_db_path)
+        # Add site_visits table
+        if "site_visits" not in db_schema_str:
+            print "Adding site_visits table"
+            add_site_visits_table(self.db_conn)
+        # Add site ranks to site_visits table
+        if "site_rank" not in db_schema_str:
+            print "Adding site ranks to site_visits table"
+            site_ranks = load_alexa_ranks(self.alexa_csv_path)
+            add_alexa_rank_to_site_visits(self.db_conn, site_ranks)
+        add_missing_columns_to_all_tables(self.db_conn, db_schema_str)
+        self.db_conn.commit()
 
     def dump_db_schema(self):
-        db_schema_str = get_table_and_column_names(self.crawl_db_path)
-        db_schema_str += "\nJavascript-source %s\n" % int(self.has_js_src)
+        self.db_schema_str = get_table_and_column_names(self.crawl_db_path)
+        out_str = self.db_schema_str
+        out_str += "\nJavascript-source %s\n" % int(self.has_js_src)
         # out_fname = basename(db_path).replace(CRAWL_DB_EXT, DB_SCHEMA_SUFFIX)
         out_fname = self.crawl_name + "-db_schema.txt"
         db_schema_path = join(DB_SCHEMA_DIR, out_fname)
         print "Writing DB schema to %s" % db_schema_path
         with open(db_schema_path, 'w') as out:
-            out.write(db_schema_str)
+            out.write(out_str)
 
     def backup_crawl_files(self):
         log_prefix = self.crawl_name + "-"

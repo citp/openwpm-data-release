@@ -18,6 +18,7 @@ OPENWPM_LOG_FILENAME = "openwpm.log"
 CRONTAB_LOG_FILENAME = "crontab.log"
 ALEXA_TOP1M_CSV_FILENAME = "top-1m.csv"
 JAVASCRIPT_SRC_DIRNAME = "content.ldb"
+DEFAULT_SQLITE_CACHE_SIZE_GB = 30
 
 
 class CrawlData(object):
@@ -33,9 +34,15 @@ class CrawlData(object):
         self.set_crawl_file_paths()
         self.check_js_src_code()
         self.db_conn = sqlite3.connect(self.crawl_db_path)
+        self.optimize_db()
+
+    def optimize_db(self, size_in_gb=DEFAULT_SQLITE_CACHE_SIZE_GB):
+        """ Runs PRAGMA queries to make sqlite better """
+        self.db_conn.execute("PRAGMA cache_size = -%i" % (size_in_gb * 10**6))
+        # Store temp tables, indices in memory
+        self.db_conn.execute("PRAGMA temp_store = 2")
 
     def set_crawl_dir(self, crawl_dir):
-        """."""
         if isdir(crawl_dir):
             self.crawl_dir = crawl_dir
         else:
@@ -80,13 +87,17 @@ class CrawlData(object):
         db_schema_str = get_table_and_column_names(self.crawl_db_path)
         # Add site_visits table
         if "site_visits" not in db_schema_str:
+            print "Missing site_visits", db_schema_str
             print "Adding site_visits table"
             add_site_visits_table(self.db_conn)
         # Add site ranks to site_visits table
         if "site_rank" not in db_schema_str:
-            print "Adding site ranks to site_visits table"
-            site_ranks = load_alexa_ranks(self.alexa_csv_path)
-            add_alexa_rank_to_site_visits(self.db_conn, site_ranks)
+            if self.alexa_csv_path:
+                print "Adding Alexa ranks to the site_visits table"
+                site_ranks = load_alexa_ranks(self.alexa_csv_path)
+                add_alexa_rank_to_site_visits(self.db_conn, site_ranks)
+            else:
+                print "Missing Alexa ranks CSV, can't add ranks to site_visits"
         add_missing_columns_to_all_tables(self.db_conn, db_schema_str)
         self.db_conn.commit()
 

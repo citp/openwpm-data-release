@@ -66,7 +66,7 @@ DB_SCHEMA_JAVASCRIPT = """
         operation TEXT,
         value TEXT,
         arguments TEXT,
-        time_stamp TEXT NOT NULL
+        time_stamp TEXT
     );
     """
 
@@ -91,11 +91,48 @@ DB_SCHEMA_JAVASCRIPT_COOKIES = """
         policy INTEGER,
         status INTEGER,
         value TEXT
-  );
-  """
+    );
+    """
+
+DB_SCHEMA_FLASH_COOKIES = """
+    CREATE TABLE IF NOT EXISTS flash_cookies (
+        id INTEGER PRIMARY KEY,
+        crawl_id INTEGER NOT NULL,
+        visit_id INTEGER NOT NULL,
+        domain VARCHAR(500),
+        filename VARCHAR(500),
+        local_path VARCHAR(1000),
+        key TEXT,
+        content TEXT,
+        FOREIGN KEY(crawl_id) REFERENCES crawl(id),
+        FOREIGN KEY(visit_id) REFERENCES site_visits(id)
+    );
+    """
+
+DB_SCHEMA_PROFILE_COOKIES = """
+    CREATE TABLE IF NOT EXISTS profile_cookies (
+        id INTEGER PRIMARY KEY,
+        crawl_id INTEGER NOT NULL,
+        visit_id INTEGER NOT NULL,
+        baseDomain TEXT,
+        name TEXT,
+        value TEXT,
+        host TEXT,
+        path TEXT,
+        expiry INTEGER,
+        accessed INTEGER,
+        creationTime INTEGER,
+        isSecure INTEGER,
+        isHttpOnly INTEGER,
+        FOREIGN KEY(crawl_id) REFERENCES crawl(id),
+        FOREIGN KEY(visit_id) REFERENCES site_visits(id)
+    );
+    """
 
 TABLE_SCHEMAS = {"http_requests": DB_SCHEMA_HTTP_REQUESTS,
                  "http_responses": DB_SCHEMA_HTTP_RESPONSES,
                  "javascript": DB_SCHEMA_JAVASCRIPT,
-                 "javascript_cookies": DB_SCHEMA_JAVASCRIPT_COOKIES
+                 "javascript_cookies": DB_SCHEMA_JAVASCRIPT_COOKIES,
+                 "flash_cookies": DB_SCHEMA_FLASH_COOKIES,
+                 "profile_cookies": DB_SCHEMA_PROFILE_COOKIES,
                  }

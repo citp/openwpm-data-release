@@ -72,7 +72,7 @@ DB_SCHEMA_JAVASCRIPT = """
 
 DB_SCHEMA_JAVASCRIPT_COOKIES = """
     CREATE TABLE IF NOT EXISTS javascript_cookies(
-        id INTEGER PRIMARY KEY ASC,
+        id INTEGER PRIMARY KEY,
         crawl_id INTEGER,
         visit_id INTEGER,
         change TEXT,

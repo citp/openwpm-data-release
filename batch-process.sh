@@ -12,9 +12,9 @@ function decompress_and_process(){
   CRAWL_DATA_PATH=$EXTRACTION_DIR/$CRAWL_NAME
   echo "Will extract $1 to $CRAWL_DATA_PATH"
   time lz4 -dc --no-sparse $1 | tar xf - -C $EXTRACTION_DIR
-  python process_crawl_data.py $CRAWL_DATA_PATH
-  rm -rf $CRAWL_DATA_PATH
-  echo "Removed $CRAWL_DATA_PATH" 
+  time python process_crawl_data.py $CRAWL_DATA_PATH
+  echo "Will remove $EXTRACTION_DIR/201*"
+  rm -rf $EXTRACTION_DIR/201*
 }
 
 for crawl_archive_lz4 in $CENSUS_LZ4_DATA_PATH/*.tar.lz4

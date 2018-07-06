@@ -18,7 +18,7 @@ OPENWPM_LOG_FILENAME = "openwpm.log"
 CRONTAB_LOG_FILENAME = "crontab.log"
 ALEXA_TOP1M_CSV_FILENAME = "top-1m.csv"
 JAVASCRIPT_SRC_DIRNAME = "content.ldb"
-DEFAULT_SQLITE_CACHE_SIZE_GB = 30
+DEFAULT_SQLITE_CACHE_SIZE_GB = 3
 
 
 class CrawlData(object):
@@ -34,6 +34,7 @@ class CrawlData(object):
         self.set_crawl_file_paths()
         self.check_js_src_code()
         self.db_conn = sqlite3.connect(self.crawl_db_path)
+        self.db_conn.row_factory = sqlite3.Row
         self.optimize_db()
 
     def optimize_db(self, size_in_gb=DEFAULT_SQLITE_CACHE_SIZE_GB):
@@ -41,6 +42,11 @@ class CrawlData(object):
         self.db_conn.execute("PRAGMA cache_size = -%i" % (size_in_gb * 10**6))
         # Store temp tables, indices in memory
         self.db_conn.execute("PRAGMA temp_store = 2")
+
+    def vacuum_db(self):
+        """."""
+        print "Will vacuum the DB"
+        self.db_conn.execute("VACUUM;")
 
     def set_crawl_dir(self, crawl_dir):
         if isdir(crawl_dir):
@@ -68,7 +74,8 @@ class CrawlData(object):
         if isfile(alexa_csv_path):
             self.alexa_csv_path = alexa_csv_path
 
-        print "Log paths", self.openwpm_log_path, self.crontab_log_path
+        print "OpenWPM log", self.openwpm_log_path
+        print "Crontab log", self.crontab_log_path
         print "Alexa CSV", self.alexa_csv_path
 
     def set_db_path(self):
@@ -82,12 +89,12 @@ class CrawlData(object):
         self.backup_crawl_files()
         self.dump_db_schema()
         self.normalize_db()
+        # self.vacuum_db()
 
     def normalize_db(self):
         db_schema_str = get_table_and_column_names(self.crawl_db_path)
         # Add site_visits table
         if "site_visits" not in db_schema_str:
-            print "Missing site_visits", db_schema_str
             print "Adding site_visits table"
             add_site_visits_table(self.db_conn)
         # Add site ranks to site_visits table
@@ -105,7 +112,6 @@ class CrawlData(object):
         self.db_schema_str = get_table_and_column_names(self.crawl_db_path)
         out_str = self.db_schema_str
         out_str += "\nJavascript-source %s\n" % int(self.has_js_src)
-        # out_fname = basename(db_path).replace(CRAWL_DB_EXT, DB_SCHEMA_SUFFIX)
         out_fname = self.crawl_name + "-db_schema.txt"
         db_schema_path = join(DB_SCHEMA_DIR, out_fname)
         print "Writing DB schema to %s" % db_schema_path

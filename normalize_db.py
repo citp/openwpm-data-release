@@ -1,4 +1,5 @@
-import time
+from __future__ import division
+from time import time
 import sqlite3
 
 from db_schema import TABLE_SCHEMAS
@@ -43,6 +44,15 @@ def add_site_visits_table(con):
     cur.executemany('INSERT INTO site_visits VALUES (?,?,?)', site_visits)
 
 
+def get_site_url_visit_id_mapping(con):
+    site_url_visit_ids = {}
+    for visit_id, site_url in con.execute(
+            "SELECT visit_id, site_url FROM site_visits"):
+        site_url_visit_ids[site_url] = visit_id
+    print len(site_url_visit_ids), "Mappings"
+    return site_url_visit_ids
+
+
 def add_alexa_rank_to_site_visits(con, site_ranks):
     visit_ranks = {}
     for visit_id, site_url in con.execute(
@@ -58,24 +68,28 @@ def add_alexa_rank_to_site_visits(con, site_ranks):
                     (site_rank, visit_id))
 
 
-def add_missing_columns(con, table_name, db_schema_str):
-    existing_columns = get_column_names_from_db_schema_str(table_name,
-                                                           db_schema_str)
+def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
     col_to_replace = None
+    existing_columns = get_column_names_from_db_schema_str(
+        table_name, db_schema_str)
     if "top_url" in existing_columns:
         col_to_replace = "top_url"
-        assert "visit_id" not in existing_columns
     elif "page_url" in existing_columns:
         col_to_replace = "page_url"
-        assert "visit_id" not in existing_columns
 
+    # column names from the up to date DB schema
     new_columns = get_column_names_from_create_query(
         TABLE_SCHEMAS[table_name])
     if new_columns == existing_columns:
-        print "No missing columns to add"
+        print "No missing columns to add to", table_name
         return
     print "Will add missing columns to %s: %s" % (table_name, set(
         new_columns).difference(set(existing_columns)))
+
+    processed = 0
+    num_rows = con.execute(
+        "SELECT MAX(id) FROM %s" % table_name).fetchone()[0]
+    # Copy the existing table to a temp table
     tmp_table_name = "_%s_old" % table_name
     con.execute("ALTER TABLE %s RENAME TO %s;" % (table_name, tmp_table_name))
 
@@ -85,39 +99,82 @@ def add_missing_columns(con, table_name, db_schema_str):
     # only keep the columns that also appear in the new table schema
     common_columns = [column for column in existing_columns
                       if column in new_columns]
+
+    t0 = time()
+    # replace top_url and page_url columns with visit_id
     if col_to_replace:
-        # replace top_url and page_url columns with visit_id
         print "Will replace %s with visit_id" % col_to_replace
-        t1_cols = ",".join(["%s.%s" % (tmp_table_name, col_name)
-                            for col_name in existing_columns])
-        # make sure we add visit_id data from the temp table
-        common_columns.append("visit_id")
+        assert "visit_id" not in existing_columns
+        # select from columns that are common to old and new table schemas
+        # col_to_replace is either top_url or page_url
+        # we use is to get the visit_id
+        cols_to_select = common_columns + [col_to_replace, ]
+        cols_to_insert = common_columns + ["visit_id", ]
+        stream_qry = "SELECT %s FROM %s " % (",".join(cols_to_select),
+                                             tmp_table_name)
+        print "Will iterate over", stream_qry
+        for row in con.execute(stream_qry):
+            try:
+                visit_id = site_url_visit_id_map[row[col_to_replace]]
+            except Exception:
+                print "Warning: Missing visit id", col_to_replace, row
+                continue
+            row = list(row)
+            row.pop()  # remove col_to_replace, we don't need it anymore
+            row.append(visit_id)  # add visit_id
+            qry = "INSERT INTO %s (%s) VALUES (%s)" % (
+                table_name, ",".join(cols_to_insert),
+                ",".join("?" * len(cols_to_insert)))
+            # print "Will execute %s" % qry
+            con.execute(qry, row)
+            processed += 1
+            print_progress(t0, processed, num_rows)
 
-        sub_qry = """SELECT %s, site_visits.visit_id
-                        FROM %s
-                        INNER JOIN site_visits
-                        ON %s.%s=site_visits.site_url""" % (
-            t1_cols, tmp_table_name, tmp_table_name, col_to_replace)
-
-        qry = "INSERT INTO %s (%s) SELECT %s FROM (%s)" % (
-            table_name, ",".join(common_columns),
-            ",".join(common_columns), sub_qry)
-        print "Will execute %s" % qry
-        con.execute(qry)
     else:
-        con.execute("INSERT INTO %s (%s) SELECT %s FROM %s" % (
-            table_name, ",".join(common_columns),
-            ",".join(common_columns), tmp_table_name))
+        # read from the temp table and write into the new table
+        stream_qry = "SELECT %s FROM %s " % (",".join(common_columns),
+                                             tmp_table_name)
+        print "Will iterate over", stream_qry
+        for row in con.execute(stream_qry):
+            qry = "INSERT INTO %s (%s) VALUES (%s)" % (
+                    table_name, ",".join(common_columns),
+                    ",".join("?" * len(common_columns)))
+            # print "Will execute %s" % qry
+            con.execute(qry, row)
+            processed += 1
+            print_progress(t0, processed, num_rows)
+
+    t0 = time()
+    print "Will drop the temp table",
     con.execute("DROP TABLE %s" % tmp_table_name)
-    con.execute("VACUUM;")
+    print "(took", time() - t0, "s)"
+    print "Will commit changes,"
+    t0 = time()
     con.commit()
+    print "(took", time() - t0, "s)"
+
+
+# print progress every million rows
+PRINT_PROGRESS_EVERY = 10**6
+
+
+def print_progress(t0, processed, num_rows):
+    if processed % PRINT_PROGRESS_EVERY == 0:
+        elapsed = time() - t0
+        speed = processed / elapsed
+        progress = 100 * processed / num_rows
+        remaining = (num_rows - processed) / speed
+        print "Processed: %iK (%0.2f%%) Speed: %d rows/s | Elapsed %0.2f"\
+            " | Remaining %d mins" % (
+                processed/1000, progress, speed, elapsed, remaining / 60)
 
 
 def get_column_names_from_create_query(create_table_query):
     col_names = []
     for line in create_table_query.split("\n"):
         line = line.strip()
-        if line.startswith("CREATE") or line.startswith(")") or not line:
+        if line.startswith("CREATE") or line.startswith("FOREIGN") \
+                or line.startswith(")") or not line:
             continue
         col_names.append(line.split()[0])
     return col_names
@@ -133,12 +190,13 @@ def get_column_names_from_db_schema_str(table_name, db_schema_str):
 
 
 def add_missing_columns_to_all_tables(con, db_schema_str):
+    site_url_visit_id_map = get_site_url_visit_id_mapping(con)
     for table_name in TABLE_SCHEMAS.keys():
         # TODO: search in table names instead of the db schema
         if table_name in db_schema_str:
-            t0 = time.time()
-            add_missing_columns(con, table_name, db_schema_str)
-            duration = time.time() - t0
+            t0 = time()
+            add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map)
+            duration = time() - t0
             print "Took %s s to add missing columns to %s" % (duration,
                                                               table_name)
 

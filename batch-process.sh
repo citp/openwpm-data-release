@@ -13,6 +13,10 @@ function decompress_and_process(){
   echo "Will extract $1 to $CRAWL_DATA_PATH"
   time lz4 -dc --no-sparse $1 | tar xf - -C $EXTRACTION_DIR
   time python process_crawl_data.py $CRAWL_DATA_PATH
+  # ls -l $EXTRACTION_DIR/201*/201*.sqlite
+  # echo "Will vacuum the database"
+  # time sqlite3 $EXTRACTION_DIR/201*/201*.sqlite 'VACUUM;'
+  # ls -l $EXTRACTION_DIR/201*/201*.sqlite
   echo "Will remove $EXTRACTION_DIR/201*"
   rm -rf $EXTRACTION_DIR/201*
 }

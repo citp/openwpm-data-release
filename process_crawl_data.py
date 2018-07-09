@@ -42,6 +42,9 @@ class CrawlData(object):
         self.db_conn.execute("PRAGMA cache_size = -%i" % (size_in_gb * 10**6))
         # Store temp tables, indices in memory
         self.db_conn.execute("PRAGMA temp_store = 2")
+        # self.db_conn.execute("PRAGMA synchronous = NORMAL;")
+        self.db_conn.execute("PRAGMA synchronous = OFF;")
+        # self.db_conn.execute("PRAGMA journal_mode = WAL;")
 
     def vacuum_db(self):
         """."""

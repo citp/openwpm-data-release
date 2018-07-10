@@ -45,6 +45,7 @@ class CrawlData(object):
         # self.db_conn.execute("PRAGMA synchronous = NORMAL;")
         self.db_conn.execute("PRAGMA synchronous = OFF;")
         # self.db_conn.execute("PRAGMA journal_mode = WAL;")
+        self.db_conn.execute("PRAGMA journal_mode = OFF;")
 
     def vacuum_db(self):
         """."""

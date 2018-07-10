@@ -133,8 +133,7 @@ def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
             processed += 1
             if processed % 10000 == 0:
                 con.executemany(insert_qry, data_to_insert)
-                con.commit()
-                data_to_insert = []
+                del data_to_insert[:]
             print_progress(t0, processed, num_rows)
         con.executemany(insert_qry, data_to_insert)
     else:
@@ -152,15 +151,14 @@ def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
             processed += 1
             if processed % 10000 == 0:
                 con.executemany(insert_qry, data_to_insert)
-                con.commit()
-                data_to_insert = []
+                del data_to_insert[:]
             print_progress(t0, processed, num_rows)
         con.executemany(insert_qry, data_to_insert)
     t0 = time()
     print "Will drop the temp table",
     con.execute("DROP TABLE %s" % tmp_table_name)
     print "(took", time() - t0, "s)"
-    print "Will commit changes,"
+    print "Will commit changes",
     t0 = time()
     con.commit()
     print "(took", time() - t0, "s)"

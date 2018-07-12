@@ -53,17 +53,26 @@ class CrawlDBAnalysis(object):
         print "Distinct site urls", len(set(visit_id_site_urls.values()))
         return visit_id_site_urls
 
-    def process_visit_data(self, visit_data):
-        pass
-
     def run_streaming_analysis_for_table(self, table_name):
         current_visit_ids = {}
         processed = 0
         num_rows = self.db_conn.execute(
                 "SELECT MAX(id) FROM %s" % table_name).fetchone()[0]
         print "Total rows", num_rows, table_name
+        cols_to_select = ["visit_id", "crawl_id"]
+        if table_name == HTTP_REQUESTS_TABLE:
+            cols_to_select.append("url")
+            # check whether top_level_url is here
+            # ultimately preprocesing will make sure all tables contain
+            # top_level_url
+            try:
+                self.db_conn.execute("SELECT top_level_url FROM %s LIMIT 1" %
+                                     table_name)
+                cols_to_select.append("top_level_url")
+            except Exception:
+                pass
 
-        query = """SELECT * FROM %s""" % (table_name)
+        query = "SELECT %s FROM %s" % (",".join(cols_to_select), table_name)
         for row in tqdm(self.db_conn.execute(query)):
             processed += 1
             visit_id = int(row["visit_id"])

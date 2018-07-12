@@ -1,7 +1,11 @@
 import sqlite3
+import json
+from time import time
 from multiprocessing import Process
 from tld import get_tld
 import ipaddress
+from os.path import isfile
+from shutil import copyfile
 try:
     from urlparse import urlparse
 except ImportError:
@@ -86,3 +90,29 @@ def is_third_party(req_url, top_level_url):
         return (False, req_ps1, site_ps1)
 
     return (True, req_ps1, site_ps1)
+
+
+def copy_if_not_exists(src, dst):
+    if not isfile(dst):
+        print "Copying %s to %s" % (src, dst)
+        copyfile(src, dst)
+
+
+def dump_as_json(obj, json_path):
+    with open(json_path, 'w') as f:
+        json.dump(obj, f)
+
+
+# print progress every million rows
+PRINT_PROGRESS_EVERY = 10**6
+
+
+def print_progress(t0, processed, num_rows):
+    if processed % PRINT_PROGRESS_EVERY == 0:
+        elapsed = time() - t0
+        speed = processed / elapsed
+        progress = 100 * processed / num_rows
+        remaining = (num_rows - processed) / speed
+        print "Processed: %iK (%0.2f%%) Speed: %d rows/s | Elapsed %0.2f"\
+            " | Remaining %d mins" % (
+                processed/1000, progress, speed, elapsed, remaining / 60)

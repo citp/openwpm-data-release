@@ -129,10 +129,24 @@ DB_SCHEMA_PROFILE_COOKIES = """
     );
     """
 
-TABLE_SCHEMAS = {"http_requests": DB_SCHEMA_HTTP_REQUESTS,
-                 "http_responses": DB_SCHEMA_HTTP_RESPONSES,
-                 "javascript": DB_SCHEMA_JAVASCRIPT,
-                 "javascript_cookies": DB_SCHEMA_JAVASCRIPT_COOKIES,
-                 "flash_cookies": DB_SCHEMA_FLASH_COOKIES,
-                 "profile_cookies": DB_SCHEMA_PROFILE_COOKIES,
+HTTP_REQUESTS_TABLE = "http_requests"
+HTTP_RESPONSES_TABLE = "http_responses"
+JAVASCRIPT_TABLE = "javascript"
+JAVASCRIPT_COOKIES_TABLE = "javascript_cookies"
+SITE_VISITS_TABLE = "site_visits"
+CRAWL_HISTORY_TABLE = "CrawlHistory"
+CRAWL_TABLE = "crawl"
+TASK_TABLE = "task"
+HTTP_REQUESTS_PROXY_TABLE = "http_requests_proxy"
+HTTP_RESPONSES_PROXY_TABLE = "http_responses_proxy"
+PROFILE_COOKIES_TABLE = "profile_cookies"
+FLASH_COOKIES_TABLE = "flash_cookies"
+LOCALSTORAGE_TABLE = "localStorage"
+
+TABLE_SCHEMAS = {HTTP_REQUESTS_TABLE: DB_SCHEMA_HTTP_REQUESTS,
+                 HTTP_RESPONSES_TABLE: DB_SCHEMA_HTTP_RESPONSES,
+                 JAVASCRIPT_TABLE: DB_SCHEMA_JAVASCRIPT,
+                 JAVASCRIPT_COOKIES_TABLE: DB_SCHEMA_JAVASCRIPT_COOKIES,
+                 FLASH_COOKIES_TABLE: DB_SCHEMA_FLASH_COOKIES,
+                 PROFILE_COOKIES_TABLE: DB_SCHEMA_PROFILE_COOKIES,
                  }

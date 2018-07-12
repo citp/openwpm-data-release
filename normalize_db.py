@@ -1,12 +1,14 @@
 from __future__ import division
 from time import time
 import sqlite3
+from util import print_progress
+from db_schema import (TABLE_SCHEMAS, HTTP_REQUESTS_TABLE,
+                       HTTP_RESPONSES_TABLE,
+                       JAVASCRIPT_TABLE, JAVASCRIPT_COOKIES_TABLE)
 
-from db_schema import TABLE_SCHEMAS
 
-
-TABLES_WITH_TOP_URL = ["http_requests", "http_responses",
-                       "javascript", "javascript_cookies"]
+TABLES_WITH_TOP_URL = [HTTP_REQUESTS_TABLE, HTTP_RESPONSES_TABLE,
+                       JAVASCRIPT_TABLE, JAVASCRIPT_COOKIES_TABLE]
 
 
 def add_visit_id_col_to_tables(con):
@@ -162,21 +164,6 @@ def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
     t0 = time()
     con.commit()
     print "(took", time() - t0, "s)"
-
-
-# print progress every million rows
-PRINT_PROGRESS_EVERY = 10**6
-
-
-def print_progress(t0, processed, num_rows):
-    if processed % PRINT_PROGRESS_EVERY == 0:
-        elapsed = time() - t0
-        speed = processed / elapsed
-        progress = 100 * processed / num_rows
-        remaining = (num_rows - processed) / speed
-        print "Processed: %iK (%0.2f%%) Speed: %d rows/s | Elapsed %0.2f"\
-            " | Remaining %d mins" % (
-                processed/1000, progress, speed, elapsed, remaining / 60)
 
 
 def get_column_names_from_create_query(create_table_query):

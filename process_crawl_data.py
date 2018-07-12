@@ -1,11 +1,14 @@
 import sys
 import sqlite3
-from util import CRAWL_DB_EXT, get_table_and_column_names, load_alexa_ranks
+import os
+from util import CRAWL_DB_EXT, get_table_and_column_names, load_alexa_ranks,\
+    copy_if_not_exists
 from os.path import join, isfile, basename, isdir, dirname, sep
 import glob
-from shutil import copyfile
 from normalize_db import add_site_visits_table, add_alexa_rank_to_site_visits,\
     add_missing_columns_to_all_tables
+from db_schema import SITE_VISITS_TABLE
+from analyze_crawl import CrawlDBAnalysis
 
 ROOT_OUT_DIR = "/mnt/10tb4/census-release"
 if not isdir(ROOT_OUT_DIR):
@@ -14,6 +17,9 @@ if not isdir(ROOT_OUT_DIR):
 DB_SCHEMA_DIR = join(ROOT_OUT_DIR, "db-schemas")
 LOG_FILES_DIR = join(ROOT_OUT_DIR, "log-files")
 ALEXA_RANKS_DIR = join(ROOT_OUT_DIR, "alexa-ranks")
+ANALYSIS_OUT_DIR = join(ROOT_OUT_DIR, "analysis")
+OUTDIRS = [DB_SCHEMA_DIR, LOG_FILES_DIR,
+           ALEXA_RANKS_DIR, ANALYSIS_OUT_DIR]
 OPENWPM_LOG_FILENAME = "openwpm.log"
 CRONTAB_LOG_FILENAME = "crontab.log"
 ALEXA_TOP1M_CSV_FILENAME = "top-1m.csv"
@@ -30,12 +36,18 @@ class CrawlData(object):
         self.openwpm_log_path = ""
         self.crontab_log_path = ""
         self.alexa_csv_path = ""
+        self.init_out_dirs()
         self.set_db_path()
         self.set_crawl_file_paths()
         self.check_js_src_code()
         self.db_conn = sqlite3.connect(self.crawl_db_path)
         self.db_conn.row_factory = sqlite3.Row
         self.optimize_db()
+
+    def init_out_dirs(self):
+        for _dir in OUTDIRS:
+            if not isdir(_dir):
+                os.makedirs(_dir)
 
     def optimize_db(self, size_in_gb=DEFAULT_SQLITE_CACHE_SIZE_GB):
         """ Runs PRAGMA queries to make sqlite better """
@@ -88,8 +100,8 @@ class CrawlData(object):
         self.crawl_db_path = sqlite_files[0]
         print "Crawl DB path", self.crawl_db_path
 
-    def process(self):
-        print "Will process", self.crawl_dir
+    def pre_process(self):
+        print "Will pre_process", self.crawl_dir
         self.backup_crawl_files()
         self.dump_db_schema()
         self.normalize_db()
@@ -98,7 +110,7 @@ class CrawlData(object):
     def normalize_db(self):
         db_schema_str = get_table_and_column_names(self.crawl_db_path)
         # Add site_visits table
-        if "site_visits" not in db_schema_str:
+        if SITE_VISITS_TABLE not in db_schema_str:
             print "Adding site_visits table"
             add_site_visits_table(self.db_conn)
         # Add site ranks to site_visits table
@@ -127,22 +139,27 @@ class CrawlData(object):
         if self.openwpm_log_path:
             openwpm_log_dst = join(LOG_FILES_DIR,
                                    log_prefix + OPENWPM_LOG_FILENAME)
-            print "Copying %s to %s" % (self.openwpm_log_path, openwpm_log_dst)
-            copyfile(self.openwpm_log_path, openwpm_log_dst)
+            copy_if_not_exists(self.openwpm_log_path, openwpm_log_dst)
 
         if self.crontab_log_path:
             crontab_log_dst = join(LOG_FILES_DIR,
                                    log_prefix + CRONTAB_LOG_FILENAME)
-            print "Copying %s to %s" % (self.crontab_log_path, crontab_log_dst)
-            copyfile(self.crontab_log_path, crontab_log_dst)
+            copy_if_not_exists(self.crontab_log_path, crontab_log_dst)
 
         if self.alexa_csv_path:
             alexa_csv_dst = join(ALEXA_RANKS_DIR,
                                  log_prefix + ALEXA_TOP1M_CSV_FILENAME)
-            print "Copying %s to %s" % (self.alexa_csv_path, alexa_csv_dst)
-            copyfile(self.alexa_csv_path, alexa_csv_dst)
+            copy_if_not_exists(self.alexa_csv_path, alexa_csv_dst)
 
+
+# Disable preprocessing for now
+# TODO: enable for the final runs
+DISABLE_PREPROCESS = True
 
 if __name__ == '__main__':
     crawl_data = CrawlData(sys.argv[1])
-    crawl_data.process()
+    if not DISABLE_PREPROCESS:
+        crawl_data.pre_process()
+    analysis = CrawlDBAnalysis(crawl_data.crawl_db_path, ANALYSIS_OUT_DIR,
+                               crawl_data.crawl_name)
+    analysis.start_analysis()

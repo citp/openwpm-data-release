@@ -73,7 +73,7 @@ class CrawlData(object):
             self.crawl_dir = crawl_dir
         else:
             print "Missing crawl dir (archive name mismatch)", crawl_dir
-            crawl_dir_pattern = join(dirname(crawl_dir), "20*")
+            crawl_dir_pattern = join(dirname(crawl_dir), "*201*")
             self.crawl_dir = glob.glob(crawl_dir_pattern)[0]
         print "Crawl dir", self.crawl_dir
 

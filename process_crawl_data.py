@@ -26,6 +26,10 @@ ALEXA_TOP1M_CSV_FILENAME = "top-1m.csv"
 JAVASCRIPT_SRC_DIRNAME = "content.ldb"
 DEFAULT_SQLITE_CACHE_SIZE_GB = 3
 
+# Disable adding new columns for now
+# TODO: enable for the final runs
+ADD_MISSING_COLUMNS = False
+
 
 class CrawlData(object):
 
@@ -121,7 +125,8 @@ class CrawlData(object):
                 add_alexa_rank_to_site_visits(self.db_conn, site_ranks)
             else:
                 print "Missing Alexa ranks CSV, can't add ranks to site_visits"
-        add_missing_columns_to_all_tables(self.db_conn, db_schema_str)
+        if ADD_MISSING_COLUMNS:
+            add_missing_columns_to_all_tables(self.db_conn, db_schema_str)
         self.db_conn.commit()
 
     def dump_db_schema(self):
@@ -152,14 +157,9 @@ class CrawlData(object):
             copy_if_not_exists(self.alexa_csv_path, alexa_csv_dst)
 
 
-# Disable preprocessing for now
-# TODO: enable for the final runs
-DISABLE_PREPROCESS = True
-
 if __name__ == '__main__':
     crawl_data = CrawlData(sys.argv[1])
-    if not DISABLE_PREPROCESS:
-        crawl_data.pre_process()
+    crawl_data.pre_process()
     analysis = CrawlDBAnalysis(crawl_data.crawl_db_path, ANALYSIS_OUT_DIR,
                                crawl_data.crawl_name)
     analysis.start_analysis()

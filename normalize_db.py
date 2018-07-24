@@ -11,6 +11,13 @@ TABLES_WITH_TOP_URL = [HTTP_REQUESTS_TABLE, HTTP_RESPONSES_TABLE,
                        JAVASCRIPT_TABLE, JAVASCRIPT_COOKIES_TABLE]
 
 
+def rename_crawl_history_table(con):
+    try:
+        con.execute("ALTER TABLE CrawlHistory RENAME TO crawl_history;")
+    except sqlite3.OperationalError:
+        pass
+
+
 def add_visit_id_col_to_tables(con):
     for table_name in TABLES_WITH_TOP_URL:
         try:
@@ -38,8 +45,9 @@ def add_site_visits_table(con):
     # See http://alweeam.com.sa in 2016-01_spider_4 for an example
     # The following query causes
     # query = "select DISTINCT top_url, MAX(crawl_id) from http_requests"
-    query = "SELECT top_url, MAX(crawl_id) FROM http_requests GROUP BY top_url"
-    for visit_id, (top_url, crawl_id) in enumerate(cur.execute(query)):
+    query = """SELECT top_url, MAX(crawl_id), MIN(id) as min_id FROM
+     http_requests GROUP BY top_url ORDER by min_id ASC"""
+    for visit_id, (top_url, crawl_id, _) in enumerate(cur.execute(query), 1):
         if not top_url:
             print "Warning: Empty top-url", top_url, crawl_id
         site_visits.append((visit_id, crawl_id, top_url))
@@ -83,8 +91,8 @@ def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
     new_columns = get_column_names_from_create_query(
         TABLE_SCHEMAS[table_name])
     if new_columns == existing_columns:
-        print "No missing columns to add to", table_name
-        return
+        # print "No missing columns to add to", table_name
+        return False
     print "Will add missing columns to %s: %s" % (table_name, set(
         new_columns).difference(set(existing_columns)))
 
@@ -115,7 +123,7 @@ def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
         cols_to_insert = common_columns + ["visit_id", ]
         stream_qry = "SELECT %s FROM %s " % (",".join(cols_to_select),
                                              tmp_table_name)
-        print "Will iterate over", stream_qry
+        # print "Will iterate over", stream_qry
         insert_qry = "INSERT INTO %s (%s) VALUES (%s)" % (
             table_name, ",".join(cols_to_insert),
             ",".join("?" * len(cols_to_insert)))
@@ -133,7 +141,7 @@ def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
             # print "Will execute %s" % qry
             # con.execute(qry, row)
             processed += 1
-            if processed % 10000 == 0:
+            if processed % 100000 == 0:
                 con.executemany(insert_qry, data_to_insert)
                 del data_to_insert[:]
             print_progress(t0, processed, num_rows)
@@ -142,7 +150,7 @@ def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
         # read from the temp table and write into the new table
         stream_qry = "SELECT %s FROM %s " % (",".join(common_columns),
                                              tmp_table_name)
-        print "Will iterate over", stream_qry
+        # print "Will iterate over", stream_qry
         insert_qry = "INSERT INTO %s (%s) VALUES (%s)" % (
                     table_name, ",".join(common_columns),
                     ",".join("?" * len(common_columns)))
@@ -151,7 +159,7 @@ def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
             # print "Will execute %s" % qry
             # con.execute(insert_qry, row)
             processed += 1
-            if processed % 10000 == 0:
+            if processed % 100000 == 0:
                 con.executemany(insert_qry, data_to_insert)
                 del data_to_insert[:]
             print_progress(t0, processed, num_rows)
@@ -160,10 +168,8 @@ def add_missing_columns(con, table_name, db_schema_str, site_url_visit_id_map):
     print "Will drop the temp table",
     con.execute("DROP TABLE %s" % tmp_table_name)
     print "(took", time() - t0, "s)"
-    print "Will commit changes",
-    t0 = time()
     con.commit()
-    print "(took", time() - t0, "s)"
+    return True
 
 
 def get_column_names_from_create_query(create_table_query):
@@ -192,11 +198,11 @@ def add_missing_columns_to_all_tables(con, db_schema_str):
         # TODO: search in table names instead of the db schema
         if table_name in db_schema_str:
             t0 = time()
-            add_missing_columns(con, table_name, db_schema_str,
-                                site_url_visit_id_map)
-            duration = time() - t0
-            print "Took %s s to add missing columns to %s" % (duration,
-                                                              table_name)
+            if add_missing_columns(con, table_name, db_schema_str,
+                                   site_url_visit_id_map):
+                duration = time() - t0
+                print "Took %s s to add missing columns to %s" % (duration,
+                                                                  table_name)
 
 
 if __name__ == '__main__':

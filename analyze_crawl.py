@@ -4,12 +4,12 @@ import sqlite3
 import os
 from os.path import isfile, join
 from collections import defaultdict
-from tqdm import tqdm
+# from tqdm import tqdm
 import util
 from db_schema import (HTTP_REQUESTS_TABLE,
                        HTTP_RESPONSES_TABLE,
-                       JAVASCRIPT_TABLE)
-from util import dump_as_json
+                       JAVASCRIPT_TABLE, OPENWPM_TABLES)
+from util import dump_as_json, get_table_and_column_names
 
 
 class CrawlDBAnalysis(object):
@@ -44,21 +44,16 @@ class CrawlDBAnalysis(object):
 
     def get_visit_id_site_url_mapping(self):
         visit_id_site_urls = {}
-        from time import time
-        t0 = time()
         for visit_id, site_url in self.db_conn.execute(
                 "SELECT visit_id, site_url FROM site_visits"):
             visit_id_site_urls[visit_id] = site_url
-        print len(visit_id_site_urls), "Mappings. Took %s s" % (time() - t0)
+        print len(visit_id_site_urls), "mappings"
         print "Distinct site urls", len(set(visit_id_site_urls.values()))
         return visit_id_site_urls
 
     def run_streaming_analysis_for_table(self, table_name):
         current_visit_ids = {}
         processed = 0
-        num_rows = self.db_conn.execute(
-                "SELECT MAX(id) FROM %s" % table_name).fetchone()[0]
-        print "Total rows", num_rows, table_name
         cols_to_select = ["visit_id", "crawl_id"]
         if table_name == HTTP_REQUESTS_TABLE:
             cols_to_select.append("url")
@@ -73,7 +68,7 @@ class CrawlDBAnalysis(object):
                 pass
 
         query = "SELECT %s FROM %s" % (",".join(cols_to_select), table_name)
-        for row in tqdm(self.db_conn.execute(query)):
+        for row in self.db_conn.execute(query):
             processed += 1
             visit_id = int(row["visit_id"])
             crawl_id = int(row["crawl_id"])
@@ -111,14 +106,32 @@ class CrawlDBAnalysis(object):
             # end of the data from the current visit
             elif visit_id > current_visit_ids[crawl_id]:
                 # self.process_visit_data(current_visit_data[crawl_id])
-                if site_url in self.sv_third_parties:
-                    del self.sv_third_parties[site_url]
+                # if site_url in self.sv_third_parties:
+                #    del self.sv_third_parties[site_url]
                 current_visit_ids[crawl_id] = visit_id
             elif visit_id < current_visit_ids[crawl_id] and visit_id > 0:
-                raise Exception(
-                    "Out of order row! Curr: %s Row: %s Crawl id: %s" %
-                    (current_visit_ids[crawl_id], visit_id, crawl_id))
+                # raise Exception(
+                #    "Out of order row! Curr: %s Row: %s Crawl id: %s" %
+                #    (current_visit_ids[crawl_id], visit_id, crawl_id))
+                print "Warning: Out of order row! Curr: %s Row: %s Crawl id: %s" % (current_visit_ids[crawl_id], visit_id, crawl_id)
+
         self.dump_crawl_data(table_name)
+
+    def print_num_of_rows(self):
+        print "Will print the number of rows"
+        db_schema_str = get_table_and_column_names(self.db_path)
+        for table_name in OPENWPM_TABLES:
+            # TODO: search in table names instead of the db schema
+            if table_name in db_schema_str:
+                try:
+                    num_rows = self.db_conn.execute(
+                        "SELECT MAX(id) FROM %s" % table_name).fetchone()[0]
+                except sqlite3.OperationalError:
+                    num_rows = self.db_conn.execute(
+                        "SELECT COUNT(*) FROM %s" % table_name).fetchone()[0]
+                if num_rows is None:
+                    num_rows = 0
+                print "Total rows", table_name, num_rows
 
     def dump_crawl_data(self, table_name):
         if table_name == HTTP_REQUESTS_TABLE:
@@ -139,36 +152,37 @@ class CrawlDBAnalysis(object):
                                                         out_file)))
 
     def start_analysis(self):
+        self.print_num_of_rows()
         self.check_crawl_history()
         self.run_all_streaming_analysis()
 
     def check_crawl_history(self):
-        """Compute failure and timeout rates for CrawlHistory table."""
+        """Compute failure and timeout rates for crawl_history table."""
         command_counts = {}  # num. of total commands by type
         fails = {}  # num. of failed commands grouped by cmd type
         timeouts = {}  # num. of timeouts
         for row in self.db_conn.execute(
             """SELECT command, count(*)
-                FROM CrawlHistory
+                FROM crawl_history
                 GROUP BY command;""").fetchall():
             command_counts[row["command"]] = row["count(*)"]
-            print "CrawlHistory Totals", row["command"], row["count(*)"]
+            print "crawl_history Totals", row["command"], row["count(*)"]
 
         for row in self.db_conn.execute(
             """SELECT command, count(*)
-                FROM CrawlHistory
+                FROM crawl_history
                 WHERE bool_success = 0
                 GROUP BY command;""").fetchall():
             fails[row["command"]] = row["count(*)"]
-            print "CrawlHistory Fails", row["command"], row["count(*)"]
+            print "crawl_history Fails", row["command"], row["count(*)"]
 
         for row in self.db_conn.execute(
             """SELECT command, count(*)
-                FROM CrawlHistory
+                FROM crawl_history
                 WHERE bool_success = -1
                 GROUP BY command;""").fetchall():
             timeouts[row["command"]] = row["count(*)"]
-            print "CrawlHistory Timeouts", row["command"], row["count(*)"]
+            print "crawl_history Timeouts", row["command"], row["count(*)"]
 
         for command in command_counts.keys():
             self.command_fail_rate[command] = (fails.get(command, 0) /

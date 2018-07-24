@@ -1,13 +1,14 @@
 import sys
 import sqlite3
 import os
+from time import time
 from util import CRAWL_DB_EXT, get_table_and_column_names, load_alexa_ranks,\
     copy_if_not_exists
 from os.path import join, isfile, basename, isdir, dirname, sep
 import glob
 from normalize_db import add_site_visits_table, add_alexa_rank_to_site_visits,\
-    add_missing_columns_to_all_tables
-from db_schema import SITE_VISITS_TABLE
+    add_missing_columns_to_all_tables, rename_crawl_history_table
+from db_schema import SITE_VISITS_TABLE, CRAWL_HISTORY_TABLE
 from analyze_crawl import CrawlDBAnalysis
 
 ROOT_OUT_DIR = "/mnt/10tb4/census-release"
@@ -24,11 +25,9 @@ OPENWPM_LOG_FILENAME = "openwpm.log"
 CRONTAB_LOG_FILENAME = "crontab.log"
 ALEXA_TOP1M_CSV_FILENAME = "top-1m.csv"
 JAVASCRIPT_SRC_DIRNAME = "content.ldb"
-DEFAULT_SQLITE_CACHE_SIZE_GB = 3
+DEFAULT_SQLITE_CACHE_SIZE_GB = 16
 
-# Disable adding new columns for now
-# TODO: enable for the final runs
-ADD_MISSING_COLUMNS = False
+ADD_MISSING_COLUMNS = True
 
 
 class CrawlData(object):
@@ -65,8 +64,10 @@ class CrawlData(object):
 
     def vacuum_db(self):
         """."""
-        print "Will vacuum the DB"
+        print "Will vacuum the DB",
+        t0 = time()
         self.db_conn.execute("VACUUM;")
+        print "finished in", float(time() - t0) / 60, "mins"
 
     def set_crawl_dir(self, crawl_dir):
         if isdir(crawl_dir):
@@ -117,6 +118,9 @@ class CrawlData(object):
         if SITE_VISITS_TABLE not in db_schema_str:
             print "Adding site_visits table"
             add_site_visits_table(self.db_conn)
+        if CRAWL_HISTORY_TABLE not in db_schema_str:
+            print "Renaming CrawlHistory table to crawl_history"
+            rename_crawl_history_table(self.db_conn)
         # Add site ranks to site_visits table
         if "site_rank" not in db_schema_str:
             if self.alexa_csv_path:
@@ -127,6 +131,7 @@ class CrawlData(object):
                 print "Missing Alexa ranks CSV, can't add ranks to site_visits"
         if ADD_MISSING_COLUMNS:
             add_missing_columns_to_all_tables(self.db_conn, db_schema_str)
+        print "Will commit the changes"
         self.db_conn.commit()
 
     def dump_db_schema(self):
@@ -158,8 +163,12 @@ class CrawlData(object):
 
 
 if __name__ == '__main__':
+    t0 = time()
     crawl_data = CrawlData(sys.argv[1])
     crawl_data.pre_process()
+    t1 = time()
+    print "Preprocess finished in", float(t1 - t0) / 60, "mins"
     analysis = CrawlDBAnalysis(crawl_data.crawl_db_path, ANALYSIS_OUT_DIR,
                                crawl_data.crawl_name)
     analysis.start_analysis()
+    print "Analysis finished in", float(time() - t1) / 60, "mins"

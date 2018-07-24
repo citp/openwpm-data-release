@@ -1,5 +1,5 @@
 # TODO:task and crawl have different, non-overlapping columns across versions.
-# xpath, site_visits, CrawlHistory, http_redirects has one version only
+# xpath, site_visits, crawl_history, http_redirects has one version only
 # flash cookies, profile_cookies has page_url/visit_id difference
 # content_policy, pages: no table
 
@@ -134,7 +134,7 @@ HTTP_RESPONSES_TABLE = "http_responses"
 JAVASCRIPT_TABLE = "javascript"
 JAVASCRIPT_COOKIES_TABLE = "javascript_cookies"
 SITE_VISITS_TABLE = "site_visits"
-CRAWL_HISTORY_TABLE = "CrawlHistory"
+CRAWL_HISTORY_TABLE = "crawl_history"
 CRAWL_TABLE = "crawl"
 TASK_TABLE = "task"
 HTTP_REQUESTS_PROXY_TABLE = "http_requests_proxy"
@@ -150,3 +150,19 @@ TABLE_SCHEMAS = {HTTP_REQUESTS_TABLE: DB_SCHEMA_HTTP_REQUESTS,
                  FLASH_COOKIES_TABLE: DB_SCHEMA_FLASH_COOKIES,
                  PROFILE_COOKIES_TABLE: DB_SCHEMA_PROFILE_COOKIES,
                  }
+
+OPENWPM_TABLES = [
+    HTTP_REQUESTS_TABLE,
+    HTTP_RESPONSES_TABLE,
+    JAVASCRIPT_TABLE,
+    JAVASCRIPT_COOKIES_TABLE,
+    SITE_VISITS_TABLE,
+    CRAWL_HISTORY_TABLE,
+    CRAWL_TABLE,
+    TASK_TABLE,
+    HTTP_REQUESTS_PROXY_TABLE,
+    HTTP_RESPONSES_PROXY_TABLE,
+    PROFILE_COOKIES_TABLE,
+    FLASH_COOKIES_TABLE,
+    LOCALSTORAGE_TABLE
+    ]

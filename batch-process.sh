@@ -6,7 +6,7 @@
 EXTRACTION_DIR="/tmp/census_tmp"
 
 CENSUS_LZ4_DATA_PATH="/mnt/10tb4/census_data_lz4"
-ROOT_OUT_DIR = "/mnt/10tb4/census-release"
+ROOT_OUT_DIR="/mnt/10tb4/census-release"
 
 CENSUS_NORMALIZED_LZ4_DATA_PATH=${ROOT_OUT_DIR}/normalized/
 mkdir -p $CENSUS_NORMALIZED_LZ4_DATA_PATH

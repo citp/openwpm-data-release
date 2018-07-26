@@ -22,7 +22,7 @@ function decompress_and_process(){
   python analyze_crawl.py $CRAWL_DATA_PATH $ROOT_OUT_DIR
   echo "Size before vacuuming"
   ls -hl $EXTRACTION_DIR/*201*/201*.sqlite
-  time sqlite3 $EXTRACTION_DIR/*201*/*201*.sqlite 'VACUUM;'
+  time sqlite3 $EXTRACTION_DIR/*201*/*201*.sqlite 'PRAGMA journal_mode = OFF; PRAGMA synchronous = OFF; PRAGMA temp_store = 2; VACUUM;'
   echo "Size after vacuuming"
   ls -hl $EXTRACTION_DIR/*201*/*201*.sqlite
   mkdir -p $CENSUS_NORMALIZED_LZ4_DATA_PATH/$2

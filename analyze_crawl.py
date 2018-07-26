@@ -1,29 +1,28 @@
 from __future__ import division
 import sys
 import sqlite3
-import os
-from os.path import isfile, join
+from time import time
+from os.path import join, basename, sep
 from collections import defaultdict
 # from tqdm import tqdm
 import util
 from db_schema import (HTTP_REQUESTS_TABLE,
                        HTTP_RESPONSES_TABLE,
                        JAVASCRIPT_TABLE, OPENWPM_TABLES)
-from util import dump_as_json, get_table_and_column_names
+from util import dump_as_json, get_table_and_column_names, get_crawl_dir,\
+    get_crawl_db_path
 
 
 class CrawlDBAnalysis(object):
 
-    def __init__(self, db_path, out_dir, crawl_name="unknown"):
+    def __init__(self, crawl_dir, out_dir):
+        self.crawl_dir = get_crawl_dir(crawl_dir)
+        self.crawl_name = basename(crawl_dir.rstrip(sep))
+        self.crawl_db_path = get_crawl_db_path(self.crawl_dir)
         self.command_fail_rate = {}
         self.command_timeout_rate = {}
-        if isfile(db_path):
-            self.db_path = db_path
-        else:
-            raise ValueError("db_path is not a file")
         self.init_db()
-        self.out_dir = out_dir
-        self.crawl_name = crawl_name
+        self.out_dir = join(out_dir, "analysis")
         self.visit_id_site_urls = self.get_visit_id_site_url_mapping()
         self.sv_num_requests = defaultdict(int)
         self.sv_num_responses = defaultdict(int)
@@ -34,7 +33,7 @@ class CrawlDBAnalysis(object):
         self.rows_without_visit_id = 0
 
     def init_db(self):
-        self.db_conn = sqlite3.connect(self.db_path)
+        self.db_conn = sqlite3.connect(self.crawl_db_path)
         self.db_conn.row_factory = sqlite3.Row
 
     def run_all_streaming_analysis(self):
@@ -113,13 +112,15 @@ class CrawlDBAnalysis(object):
                 # raise Exception(
                 #    "Out of order row! Curr: %s Row: %s Crawl id: %s" %
                 #    (current_visit_ids[crawl_id], visit_id, crawl_id))
-                print "Warning: Out of order row! Curr: %s Row: %s Crawl id: %s" % (current_visit_ids[crawl_id], visit_id, crawl_id)
+                print ("Warning: Out of order row! Curr: %s Row: %s"
+                       " Crawl id: %s" % (
+                           current_visit_ids[crawl_id], visit_id, crawl_id))
 
         self.dump_crawl_data(table_name)
 
     def print_num_of_rows(self):
         print "Will print the number of rows"
-        db_schema_str = get_table_and_column_names(self.db_path)
+        db_schema_str = get_table_and_column_names(self.crawl_db_path)
         for table_name in OPENWPM_TABLES:
             # TODO: search in table names instead of the db schema
             if table_name in db_schema_str:
@@ -195,5 +196,7 @@ class CrawlDBAnalysis(object):
 
 
 if __name__ == '__main__':
-    crawl_db_check = CrawlDBAnalysis(sys.argv[1], os.getcwd())
+    t0 = time()
+    crawl_db_check = CrawlDBAnalysis(sys.argv[1], sys.argv[2])
     crawl_db_check.start_analysis()
+    print "Analysis finished in %0.1f mins" % ((time() - t0) / 60)

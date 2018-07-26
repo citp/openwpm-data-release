@@ -2,25 +2,17 @@ import sys
 import sqlite3
 import os
 from time import time
-from util import CRAWL_DB_EXT, get_table_and_column_names, load_alexa_ranks,\
-    copy_if_not_exists
-from os.path import join, isfile, basename, isdir, dirname, sep
-import glob
+from util import get_table_and_column_names, load_alexa_ranks,\
+    copy_if_not_exists, get_crawl_dir, get_crawl_db_path
+from os.path import join, isfile, basename, isdir, sep
 from normalize_db import add_site_visits_table, add_alexa_rank_to_site_visits,\
     add_missing_columns_to_all_tables, rename_crawl_history_table
 from db_schema import SITE_VISITS_TABLE, CRAWL_HISTORY_TABLE
-from analyze_crawl import CrawlDBAnalysis
 
 ROOT_OUT_DIR = "/mnt/10tb4/census-release"
 if not isdir(ROOT_OUT_DIR):
     ROOT_OUT_DIR = "/tmp/census-release"
 
-DB_SCHEMA_DIR = join(ROOT_OUT_DIR, "db-schemas")
-LOG_FILES_DIR = join(ROOT_OUT_DIR, "log-files")
-ALEXA_RANKS_DIR = join(ROOT_OUT_DIR, "alexa-ranks")
-ANALYSIS_OUT_DIR = join(ROOT_OUT_DIR, "analysis")
-OUTDIRS = [DB_SCHEMA_DIR, LOG_FILES_DIR,
-           ALEXA_RANKS_DIR, ANALYSIS_OUT_DIR]
 OPENWPM_LOG_FILENAME = "openwpm.log"
 CRONTAB_LOG_FILENAME = "crontab.log"
 ALEXA_TOP1M_CSV_FILENAME = "top-1m.csv"
@@ -32,23 +24,30 @@ ADD_MISSING_COLUMNS = True
 
 class CrawlData(object):
 
-    def __init__(self, crawl_dir):
-        self.set_crawl_dir(crawl_dir)
-        self.crawl_name = basename(crawl_dir.rstrip(sep))
-        self.crawl_db_path = ""
+    def __init__(self, crawl_dir, out_dir):
         self.openwpm_log_path = ""
         self.crontab_log_path = ""
         self.alexa_csv_path = ""
-        self.init_out_dirs()
-        self.set_db_path()
+        self.crawl_dir = get_crawl_dir(crawl_dir)
+        print "Crawl dir", self.crawl_dir
+        self.crawl_name = basename(crawl_dir.rstrip(sep))
+        self.init_out_dirs(out_dir)
+        self.crawl_db_path = get_crawl_db_path(self.crawl_dir)
+        print "Crawl DB path", self.crawl_db_path
         self.set_crawl_file_paths()
         self.check_js_src_code()
         self.db_conn = sqlite3.connect(self.crawl_db_path)
         self.db_conn.row_factory = sqlite3.Row
         self.optimize_db()
 
-    def init_out_dirs(self):
-        for _dir in OUTDIRS:
+    def init_out_dirs(self, out_dir):
+        self.db_schema_dir = join(out_dir, "db-schemas")
+        self.log_files_dir = join(out_dir, "log-files")
+        self.alexa_ranks_dir = join(out_dir, "alexa-ranks")
+
+        for _dir in [self.db_schema_dir,
+                     self.log_files_dir,
+                     self.alexa_ranks_dir]:
             if not isdir(_dir):
                 os.makedirs(_dir)
 
@@ -68,15 +67,6 @@ class CrawlData(object):
         t0 = time()
         self.db_conn.execute("VACUUM;")
         print "finished in", float(time() - t0) / 60, "mins"
-
-    def set_crawl_dir(self, crawl_dir):
-        if isdir(crawl_dir):
-            self.crawl_dir = crawl_dir
-        else:
-            print "Missing crawl dir (archive name mismatch)", crawl_dir
-            crawl_dir_pattern = join(dirname(crawl_dir), "*201*")
-            self.crawl_dir = glob.glob(crawl_dir_pattern)[0]
-        print "Crawl dir", self.crawl_dir
 
     def check_js_src_code(self):
         js_sources_dir = join(self.crawl_dir, JAVASCRIPT_SRC_DIRNAME)
@@ -98,12 +88,6 @@ class CrawlData(object):
         print "OpenWPM log", self.openwpm_log_path
         print "Crontab log", self.crontab_log_path
         print "Alexa CSV", self.alexa_csv_path
-
-    def set_db_path(self):
-        sqlite_files = glob.glob(join(self.crawl_dir, "*" + CRAWL_DB_EXT))
-        assert len(sqlite_files) == 1
-        self.crawl_db_path = sqlite_files[0]
-        print "Crawl DB path", self.crawl_db_path
 
     def pre_process(self):
         print "Will pre_process", self.crawl_dir
@@ -139,7 +123,7 @@ class CrawlData(object):
         out_str = self.db_schema_str
         out_str += "\nJavascript-source %s\n" % int(self.has_js_src)
         out_fname = self.crawl_name + "-db_schema.txt"
-        db_schema_path = join(DB_SCHEMA_DIR, out_fname)
+        db_schema_path = join(self.db_schema_dir, out_fname)
         print "Writing DB schema to %s" % db_schema_path
         with open(db_schema_path, 'w') as out:
             out.write(out_str)
@@ -147,28 +131,23 @@ class CrawlData(object):
     def backup_crawl_files(self):
         log_prefix = self.crawl_name + "-"
         if self.openwpm_log_path:
-            openwpm_log_dst = join(LOG_FILES_DIR,
+            openwpm_log_dst = join(self.log_files_dir,
                                    log_prefix + OPENWPM_LOG_FILENAME)
             copy_if_not_exists(self.openwpm_log_path, openwpm_log_dst)
 
         if self.crontab_log_path:
-            crontab_log_dst = join(LOG_FILES_DIR,
+            crontab_log_dst = join(self.log_files_dir,
                                    log_prefix + CRONTAB_LOG_FILENAME)
             copy_if_not_exists(self.crontab_log_path, crontab_log_dst)
 
         if self.alexa_csv_path:
-            alexa_csv_dst = join(ALEXA_RANKS_DIR,
+            alexa_csv_dst = join(self.alexa_ranks_dir,
                                  log_prefix + ALEXA_TOP1M_CSV_FILENAME)
             copy_if_not_exists(self.alexa_csv_path, alexa_csv_dst)
 
 
 if __name__ == '__main__':
     t0 = time()
-    crawl_data = CrawlData(sys.argv[1])
+    crawl_data = CrawlData(sys.argv[1], sys.argv[2])
     crawl_data.pre_process()
-    t1 = time()
-    print "Preprocess finished in", float(t1 - t0) / 60, "mins"
-    analysis = CrawlDBAnalysis(crawl_data.crawl_db_path, ANALYSIS_OUT_DIR,
-                               crawl_data.crawl_name)
-    analysis.start_analysis()
-    print "Analysis finished in", float(time() - t1) / 60, "mins"
+    print "Preprocess finished in %0.1f mins" % ((time() - t0) / 60)

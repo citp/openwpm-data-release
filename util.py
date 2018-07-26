@@ -4,7 +4,9 @@ from time import time
 from multiprocessing import Process
 from tld import get_tld
 import ipaddress
+from os.path import join, isfile, basename, isdir, dirname, sep
 from os.path import isfile
+import glob
 from shutil import copyfile
 try:
     from urlparse import urlparse
@@ -103,6 +105,21 @@ def dump_as_json(obj, json_path):
         json.dump(obj, f)
 
 
+def get_crawl_db_path(crawl_dir):
+    sqlite_files = glob.glob(join(crawl_dir, "*" + CRAWL_DB_EXT))
+    assert len(sqlite_files) == 1
+    return sqlite_files[0]
+
+
+def get_crawl_dir(crawl_dir):
+    if isdir(crawl_dir):
+        return crawl_dir
+    else:
+        print "Missing crawl dir (archive name mismatch)", crawl_dir
+        crawl_dir_pattern = join(dirname(crawl_dir), "*201*")
+        crawl_dir = glob.glob(crawl_dir_pattern)
+        assert len(crawl_dir) == 1
+        return crawl_dir[0]
 # print progress every million rows
 PRINT_PROGRESS_EVERY = 10**6
 

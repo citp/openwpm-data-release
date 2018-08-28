@@ -4,7 +4,6 @@ import sqlite3
 from time import time
 from os.path import join, basename, sep
 from collections import defaultdict
-# from tqdm import tqdm
 import util
 from db_schema import (HTTP_REQUESTS_TABLE,
                        HTTP_RESPONSES_TABLE,
@@ -35,6 +34,18 @@ class CrawlDBAnalysis(object):
     def init_db(self):
         self.db_conn = sqlite3.connect(self.crawl_db_path)
         self.db_conn.row_factory = sqlite3.Row
+        self.optimize_db()
+
+    def optimize_db(self, size_in_gb=20):
+        """ Runs PRAGMA queries to make sqlite better """
+        self.db_conn.execute("PRAGMA cache_size = -%i" % (size_in_gb * 10**6))
+        # Store temp tables, indices in memory
+        self.db_conn.execute("PRAGMA temp_store = 2")
+        # self.db_conn.execute("PRAGMA synchronous = NORMAL;")
+        self.db_conn.execute("PRAGMA synchronous = OFF;")
+        # self.db_conn.execute("PRAGMA journal_mode = WAL;")
+        self.db_conn.execute("PRAGMA journal_mode = OFF;")
+        self.db_conn.execute("PRAGMA page_size = 32768;")
 
     def run_all_streaming_analysis(self):
         self.run_streaming_analysis_for_table(HTTP_REQUESTS_TABLE)
@@ -54,6 +65,7 @@ class CrawlDBAnalysis(object):
         current_visit_ids = {}
         processed = 0
         cols_to_select = ["visit_id", "crawl_id"]
+        print "Will analyze %s" % table_name
         if table_name == HTTP_REQUESTS_TABLE:
             cols_to_select.append("url")
             # check whether top_level_url is here

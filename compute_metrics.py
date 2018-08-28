@@ -9,9 +9,6 @@ from db_schema import (HTTP_REQUESTS_TABLE,
                        HTTP_RESPONSES_TABLE,
                        JAVASCRIPT_TABLE)
 
-TABLES_TO_CHECK = (HTTP_REQUESTS_TABLE,
-                   HTTP_RESPONSES_TABLE,
-                   JAVASCRIPT_TABLE)
 
 CMD_FAIL_RATES_JSON = "_command_fail_rate.json"
 CMD_TIMEOUT_RATES_JSON = "_command_timeout_rate.json"

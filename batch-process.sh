@@ -5,8 +5,10 @@
 # EXTRACTION_DIR="/mnt/ssd/census_tmp"
 EXTRACTION_DIR="/tmp/census_tmp"
 
-CENSUS_LZ4_DATA_PATH="/mnt/10tb4/census_data_lz4"
-ROOT_OUT_DIR="/mnt/10tb4/census-release"
+# CENSUS_LZ4_DATA_PATH="/mnt/10tb4/census_data_lz4"
+CENSUS_LZ4_DATA_PATH="/media/gacar/6TB/openwpm-data-release"
+#ROOT_OUT_DIR="/mnt/10tb4/census-release"
+ROOT_OUT_DIR="/media/gacar/6TB/openwpm-data-release/data"
 
 CENSUS_NORMALIZED_LZ4_DATA_PATH=${ROOT_OUT_DIR}/normalized/
 mkdir -p $CENSUS_NORMALIZED_LZ4_DATA_PATH
@@ -19,14 +21,14 @@ function decompress_and_process(){
   echo "Will extract $1 to $CRAWL_DATA_PATH"
   time lz4 -qdc --no-sparse $1 | tar xf - -C $EXTRACTION_DIR
   python process_crawl_data.py $CRAWL_DATA_PATH $ROOT_OUT_DIR
-  python analyze_crawl.py $CRAWL_DATA_PATH $ROOT_OUT_DIR
   echo "Size before vacuuming"
   ls -hl $EXTRACTION_DIR/*201*/201*.sqlite
-  time sqlite3 $EXTRACTION_DIR/*201*/*201*.sqlite 'PRAGMA journal_mode = OFF; PRAGMA synchronous = OFF; PRAGMA temp_store = 2; VACUUM;'
+  time sqlite3 $EXTRACTION_DIR/*201*/*201*.sqlite 'PRAGMA journal_mode = OFF; PRAGMA synchronous = OFF; PRAGMA page_size = 32768; VACUUM;'
   echo "Size after vacuuming"
   ls -hl $EXTRACTION_DIR/*201*/*201*.sqlite
-  mkdir -p $CENSUS_NORMALIZED_LZ4_DATA_PATH/$2
+  python analyze_crawl.py $CRAWL_DATA_PATH $ROOT_OUT_DIR
 
+  mkdir -p $CENSUS_NORMALIZED_LZ4_DATA_PATH/$2
   OUT_NORMALIZED_ARCHIVE=$EXTRACTION_DIR/$ARCHIVE_BASE_NAME
   pushd .
   cd $EXTRACTION_DIR
@@ -40,6 +42,6 @@ function decompress_and_process(){
   # rm $1
 }
 
-for crawl_archive_lz4 in $CENSUS_LZ4_DATA_PATH/$1/*.tar.lz4
+for crawl_archive_lz4 in $CENSUS_LZ4_DATA_PATH/$1/2018*.tar.lz4
   do decompress_and_process $crawl_archive_lz4 $1
 done;

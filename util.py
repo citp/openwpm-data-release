@@ -4,8 +4,7 @@ from time import time
 from multiprocessing import Process
 from tld import get_tld
 import ipaddress
-from os.path import join, isfile, basename, isdir, dirname, sep
-from os.path import isfile
+from os.path import join, isfile,  isdir, dirname
 import glob
 from shutil import copyfile
 try:
@@ -16,6 +15,8 @@ except ImportError:
 
 CRAWL_DB_EXT = ".sqlite"
 DB_SCHEMA_SUFFIX = "_db_schema.txt"
+# print progress every million rows
+PRINT_PROGRESS_EVERY = 10**6
 
 
 def load_alexa_ranks(alexa_csv_path):
@@ -100,6 +101,10 @@ def copy_if_not_exists(src, dst):
         copyfile(src, dst)
 
 
+def read_json(json_path):
+    return json.load(open(json_path))
+
+
 def dump_as_json(obj, json_path):
     with open(json_path, 'w') as f:
         json.dump(obj, f)
@@ -120,8 +125,6 @@ def get_crawl_dir(crawl_dir):
         crawl_dir = glob.glob(crawl_dir_pattern)
         assert len(crawl_dir) == 1
         return crawl_dir[0]
-# print progress every million rows
-PRINT_PROGRESS_EVERY = 10**6
 
 
 def print_progress(t0, processed, num_rows):

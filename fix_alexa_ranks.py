@@ -37,6 +37,7 @@ class FixAlexaRanks(object):
             self.add_real_alexa_rank_to_site_visits()
         else:
             self.copy_old_ranks_to_new_ranks_col()
+        self.db_conn.commit()
 
     def get_crawl_start_date(self):
         crawl_start_time = self.db_conn.execute("""SELECT start_time FROM crawl
@@ -53,7 +54,7 @@ class FixAlexaRanks(object):
         return alexa_csv_name
 
     def add_new_alexa_rank_col(self):
-        # support to RENAME columns was very recently introduced (in sqlite3)
+        # support for RENAME is introduced a few days ago in sqlite v3.25
         # we run this code on systems where we installed fresh built sqlite3
         # (v3.25) from source
         call(["sqlite3", self.crawl_db_path,
@@ -64,8 +65,8 @@ class FixAlexaRanks(object):
         self.db_conn.execute("ALTER TABLE site_visits ADD alexa_rank INTEGER;")
 
     def copy_old_ranks_to_new_ranks_col(self):
-        self.db_conn.execute("""UPDATE TABLE site_visits
-            SET alexa_rank = crawled_alexa_rank;""")
+        self.db_conn.execute("""UPDATE site_visits
+             SET alexa_rank = crawled_alexa_rank;""")
 
     def add_real_alexa_rank_to_site_visits(self):
         real_visit_ranks = {}

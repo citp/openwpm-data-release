@@ -72,16 +72,20 @@ class FixAlexaRanks(object):
         real_visit_ranks = {}
         alexa_csv_name = self.download_alexa_ranks()
         real_alexa_ranks = read_alexa_csv(alexa_csv_name)
+        num_null_ranks = 0
         for visit_id, site_url in self.db_conn.execute(
              "SELECT visit_id, site_url FROM site_visits"):
             site_address = site_url.replace("http://", "")
             real_visit_ranks[visit_id] = real_alexa_ranks.get(site_address,
-                                                              "None")
+                                                              None)
 
         for visit_id, alexa_rank in real_visit_ranks.iteritems():
+            if alexa_rank is None:
+                num_null_ranks += 1
             self.db_conn.execute("UPDATE site_visits SET alexa_rank=? "
                                  "WHERE visit_id=?",
                                  (alexa_rank, visit_id))
+        print "NULL ranks", self.crawl_name, num_null_ranks
 
 
 if __name__ == '__main__':

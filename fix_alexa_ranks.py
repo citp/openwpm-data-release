@@ -43,10 +43,20 @@ class FixAlexaRanks(object):
         crawl_start_time = self.db_conn.execute("""SELECT start_time FROM crawl
                 ORDER BY start_time ASC LIMIT 1;""").fetchone()[0]
         self.crawl_date_ymd = crawl_start_time.split()[0]
-        self.crawl_year = int(self.crawl_date_ymd.split("-")[0])
+        self.crawl_year, self.crawl_month, self.crawl_day = [
+            int(x) for x in self.crawl_date_ymd.split("-")]
 
     def download_alexa_ranks(self):
-        alexa_csv_name = "alexa-top1m-%s.csv" % self.crawl_date_ymd
+        # file name structure changes on 2018-05-24
+        if (self.crawl_year < 2018 or
+                (self.crawl_year == 2018 and self.crawl_month < 5) or
+                (self.crawl_year == 2018 and self.crawl_month == 5 and
+                 self.crawl_day < 24)):
+            alexa_csv_name = "alexa-top1m-%s.csv" % self.crawl_date_ymd
+        else:
+            alexa_csv_name = "alexa-top1m-%s_0900_UTC.csv" % \
+                self.crawl_date_ymd
+
         alexa_xz_archive_name = "%s.xz" % alexa_csv_name
         alexa_xz_archive_url = ALEXA_ARCHIVE_BASE_URL + alexa_xz_archive_name
         call(["wget", alexa_xz_archive_url])

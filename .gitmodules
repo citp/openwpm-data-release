@@ -1,0 +1,6 @@
+[submodule "crawl_utils"]
+	path = crawl_utils
+	url = https://github.com/englehardt/crawl_utils
+[submodule "notebooks/crawl_utils"]
+	path = notebooks/crawl_utils
+	url = https://github.com/englehardt/crawl_utils

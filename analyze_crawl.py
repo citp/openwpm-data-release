@@ -1,8 +1,9 @@
 from __future__ import division
+import os
 import sys
 import sqlite3
 from time import time
-from os.path import join, basename, sep
+from os.path import join, basename, sep, isdir
 from collections import defaultdict
 import util
 from db_schema import (HTTP_REQUESTS_TABLE,
@@ -22,11 +23,14 @@ class CrawlDBAnalysis(object):
         self.command_timeout_rate = {}
         self.init_db()
         self.out_dir = join(out_dir, "analysis")
+        self.init_out_dir()
         self.visit_id_site_urls = self.get_visit_id_site_url_mapping()
         self.sv_num_requests = defaultdict(int)
         self.sv_num_responses = defaultdict(int)
         self.sv_num_javascript = defaultdict(int)
         self.sv_num_third_parties = defaultdict(int)
+        self.num_entries_without_visit_id = defaultdict(int)
+        self.num_entries = defaultdict(int)
         self.sv_third_parties = defaultdict(set)
         self.tp_to_publishers = defaultdict(set)
         self.rows_without_visit_id = 0
@@ -35,6 +39,10 @@ class CrawlDBAnalysis(object):
         self.db_conn = sqlite3.connect(self.crawl_db_path)
         self.db_conn.row_factory = sqlite3.Row
         self.optimize_db()
+
+    def init_out_dir(self):
+        if not isdir(self.out_dir):
+            os.makedirs(self.out_dir)
 
     def optimize_db(self, size_in_gb=20):
         """ Runs PRAGMA queries to make sqlite better """
@@ -168,6 +176,39 @@ class CrawlDBAnalysis(object):
         self.print_num_of_rows()
         self.check_crawl_history()
         self.run_all_streaming_analysis()
+        self.dump_entries_without_visit_ids()
+
+    def get_num_entries_without_visit_id(self, table_name):
+        query = "SELECT count(*) FROM %s WHERE visit_id = -1;" % table_name
+        try:
+            return self.db_conn.execute(query).fetchone()[0]
+        except Exception:
+            return 0
+
+    def get_num_entries(self, table_name):
+        query = "SELECT count(*) FROM %s;" % table_name
+        return self.db_conn.execute(query).fetchone()[0]
+
+    def dump_entries_without_visit_ids(self):
+        """All these metrics can be computed during the streaming analysis."""
+        self.num_entries[HTTP_REQUESTS_TABLE] = self.get_num_entries(
+            HTTP_REQUESTS_TABLE)
+        self.num_entries_without_visit_id[HTTP_REQUESTS_TABLE] = \
+            self.get_num_entries_without_visit_id(HTTP_REQUESTS_TABLE)
+
+        self.num_entries[HTTP_RESPONSES_TABLE] = self.get_num_entries(
+            HTTP_RESPONSES_TABLE)
+        self.num_entries_without_visit_id[HTTP_RESPONSES_TABLE] =\
+            self.get_num_entries_without_visit_id(HTTP_RESPONSES_TABLE)
+
+        self.num_entries[JAVASCRIPT_TABLE] = self.get_num_entries(
+            JAVASCRIPT_TABLE)
+        self.num_entries_without_visit_id[JAVASCRIPT_TABLE] =\
+            self.get_num_entries_without_visit_id(JAVASCRIPT_TABLE)
+
+        self.dump_json(self.num_entries_without_visit_id,
+                       "entries_without_visit_id.json")
+        self.dump_json(self.num_entries, "num_entries.json")
 
     def check_crawl_history(self):
         """Compute failure and timeout rates for crawl_history table."""

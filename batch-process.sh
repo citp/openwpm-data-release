@@ -1,7 +1,7 @@
 #!/bin/bash
 #set -e
 
-# We'll extract, process and delete each compressed crawl data
+# Preprocess and analyze compressed crawl databases
 # EXTRACTION_DIR="/mnt/ssd/census_tmp"
 EXTRACTION_DIR="/tmp/census_tmp"
 
@@ -32,16 +32,14 @@ function decompress_and_process(){
   OUT_NORMALIZED_ARCHIVE=$EXTRACTION_DIR/$ARCHIVE_BASE_NAME
   pushd .
   cd $EXTRACTION_DIR
-  tar c *201* | lz4 -zq - $OUT_NORMALIZED_ARCHIVE
+  tar c *201* | lz4 -9zq - $OUT_NORMALIZED_ARCHIVE
   popd
   scp $OUT_NORMALIZED_ARCHIVE odin://mnt/10tb2/census-release-normalized/$2/
   rm $OUT_NORMALIZED_ARCHIVE
   echo "Will remove $EXTRACTION_DIR/*201*"
   rm -rf $EXTRACTION_DIR/*201*
-  # !!! retain the original archive
-  # rm $1
 }
 
-for crawl_archive_lz4 in $CENSUS_LZ4_DATA_PATH/$1/2018*.tar.lz4
+for crawl_archive_lz4 in $CENSUS_LZ4_DATA_PATH/$1/*.tar.lz4
   do decompress_and_process $crawl_archive_lz4 $1
 done;

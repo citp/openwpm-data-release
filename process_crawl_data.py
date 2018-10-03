@@ -8,6 +8,7 @@ from os.path import join, isfile, basename, isdir, sep
 from normalize_db import add_site_visits_table, add_alexa_rank_to_site_visits,\
     add_missing_columns_to_all_tables, rename_crawl_history_table
 from db_schema import SITE_VISITS_TABLE, CRAWL_HISTORY_TABLE
+from fix_alexa_ranks import FixAlexaRanks
 
 ROOT_OUT_DIR = "/mnt/10tb4/census-release"
 if not isdir(ROOT_OUT_DIR):
@@ -94,7 +95,12 @@ class CrawlData(object):
         self.backup_crawl_files()
         self.dump_db_schema()
         self.normalize_db()
+        self.fix_alexa_ranks()
         # self.vacuum_db()
+
+    def fix_alexa_ranks(self):
+        fix_ranks = FixAlexaRanks(self.crawl_dir)
+        fix_ranks.fix_alexa_ranks()
 
     def normalize_db(self):
         db_schema_str = get_table_and_column_names(self.crawl_db_path)

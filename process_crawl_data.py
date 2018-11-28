@@ -20,7 +20,10 @@ ALEXA_TOP1M_CSV_FILENAME = "top-1m.csv"
 JAVASCRIPT_SRC_DIRNAME = "content.ldb"
 DEFAULT_SQLITE_CACHE_SIZE_GB = 20
 
-ADD_MISSING_COLUMNS = True
+# We won't be adding missing columns after the public release in Nov 2018.
+# Instead crawl databases will reflect the changes in OpenWPM schema
+# to keep up with the updates.
+ADD_MISSING_COLUMNS = False
 
 
 class CrawlData(object):
